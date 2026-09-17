@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>حجز مكان — المبدع</title>
+<style>
+  :root {
+    --primary: #2563eb; --primary-dark: #1d4ed8; --success: #16a34a; --danger: #dc2626;
+    --text: #1e293b; --text-muted: #64748b; --border: #e2e8f0;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", Tahoma, Arial, sans-serif; direction: rtl; margin: 0;
+    background: linear-gradient(135deg, #0f172a, #1e293b); min-height: 100vh;
+    display: flex; align-items: center; justify-content: center; padding: 20px;
+  }
+  .card {
+    background: #fff; border-radius: 16px; padding: 36px 32px; width: 380px; max-width: 100%;
+    box-shadow: 0 20px 60px rgba(0,0,0,.35); text-align: center;
+  }
+  h1 { font-size: 24px; color: var(--primary); margin: 0 0 4px; }
+  .sub { color: var(--text-muted); font-size: 13px; margin-bottom: 22px; }
+  form { text-align: right; display: flex; flex-direction: column; gap: 6px; }
+  label { font-size: 13px; color: var(--text-muted); margin-top: 8px; }
+  input {
+    padding: 11px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 15px;
+    font-family: inherit;
+  }
+  #code-input { text-align: center; font-size: 22px; letter-spacing: 4px; text-transform: uppercase; }
+  button {
+    margin-top: 16px; padding: 12px; border: none; border-radius: 8px; background: var(--primary);
+    color: #fff; font-size: 15px; font-weight: 700; cursor: pointer; font-family: inherit;
+  }
+  button:hover { background: var(--primary-dark); }
+  button:disabled { opacity: .6; cursor: not-allowed; }
+  .error { color: var(--danger); font-size: 13.5px; margin-top: 10px; min-height: 18px; }
+  .success-icon { font-size: 48px; margin-bottom: 8px; }
+  .loading { color: var(--text-muted); font-size: 13.5px; }
+  .code-info { background: #eff6ff; border-radius: 8px; padding: 10px 14px; font-size: 13px; color: var(--text); margin-bottom: 6px; }
+</style>
+</head>
+<body>
+  <div class="card" id="app-card">
+    <h1>حجز مكان</h1>
+    <p class="sub">أدخل كود الحجز الذي حصلت عليه لإكمال التسجيل</p>
+    <form id="code-form">
+      <input id="code-input" maxlength="6" placeholder="XXXXXX" required autofocus />
+      <div class="error" id="code-error"></div>
+      <button type="submit">تحقق من الكود</button>
+    </form>
+  </div>
+
+  <!--
+    STEP 1: create a free Firebase project (see BOOKING_SETUP.md in the main
+    project for exact steps), enable Firestore, then paste your project's own
+    Web app config below. This config (apiKey etc.) is SAFE to expose publicly
+    — it is not a secret; real protection comes from Firestore Security Rules
+    (see firestore.rules in this same folder), not from hiding this config.
+  -->
+  <script>
+    const FIREBASE_CONFIG = {
+      apiKey: "AIzaSyAOGyrXpUEL45z-7FqPXCvBHtPIhXfPM_Q",
+      authDomain: "mast-2fc66.firebaseapp.com",
+      projectId: "mast-2fc66",
+    };
+  </script>
+
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+  <script>
+    firebase.initializeApp(FIREBASE_CONFIG);
+    const db = firebase.firestore();
+
+    const card = document.getElementById('app-card');
+
+    document.getElementById('code-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const code = document.getElementById('code-input').value.trim().toUpperCase();
+      const errorEl = document.getElementById('code-error');
+      errorEl.textContent = '';
+      const submitBtn = e.target.querySelector('button');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'جارٍ التحقق...';
+
+      try {
+        const docRef = db.collection('codes').doc(code);
+        const doc = await docRef.get();
+
+        if (!doc.exists) {
+          errorEl.textContent = 'هذا الكود غير موجود. تأكد من كتابته بشكل صحيح.';
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'تحقق من الكود';
+          return;
+        }
+        const data = doc.data();
+        if (data.status === 'used') {
+          errorEl.textContent = 'هذا الكود محجوز بالفعل.';
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'تحقق من الكود';
+          return;
+        }
+        showRegistrationForm(code, data);
+      } catch (err) {
+        errorEl.textContent = 'حدث خطأ في الاتصال. تأكد من اتصالك بالإنترنت وحاول مرة أخرى.';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'تحقق من الكود';
+        console.error(err);
+      }
+    });
+
+    function showRegistrationForm(code, codeData) {
+      card.innerHTML = `
+        <h1>إكمال التسجيل</h1>
+        <div class="code-info">
+          الكود: <b>${code}</b>
+          ${codeData.grade ? ' · ' + codeData.grade : ''}
+          ${codeData.groupName ? ' · ' + codeData.groupName : ''}
+        </div>
+        <form id="register-form">
+          <label>اسم الطالب *</label>
+          <input name="studentName" required />
+          <label>رقم الهاتف</label>
+          <input name="studentPhone" type="tel" />
+          <label>رقم الواتساب</label>
+          <input name="studentWhatsapp" type="tel" />
+          <label>رقم ولي الأمر</label>
+          <input name="parentPhone" type="tel" />
+          <div class="error" id="register-error"></div>
+          <button type="submit">إرسال الحجز</button>
+        </form>
+      `;
+      document.getElementById('register-form').addEventListener('submit', (e) => submitRegistration(e, code));
+    }
+
+    async function submitRegistration(e, code) {
+      e.preventDefault();
+      const errorEl = document.getElementById('register-error');
+      errorEl.textContent = '';
+      const submitBtn = e.target.querySelector('button');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'جارٍ الإرسال...';
+
+      const formData = new FormData(e.target);
+      const payload = {
+        status: 'used',
+        studentName: formData.get('studentName'),
+        studentPhone: formData.get('studentPhone') || null,
+        studentWhatsapp: formData.get('studentWhatsapp') || null,
+        parentPhone: formData.get('parentPhone') || null,
+        usedAt: new Date().toISOString(),
+      };
+
+      try {
+        const docRef = db.collection('codes').doc(code);
+        // Re-check right before writing to give a fast, friendly error —
+        // the REAL guarantee against double-booking is enforced server-side
+        // by Firestore Security Rules (see firestore.rules), which will
+        // reject this write outright if another parent already used this
+        // code in the meantime, even if this check here raced and passed.
+        const fresh = await docRef.get();
+        if (fresh.data().status === 'used') {
+          errorEl.textContent = 'هذا الكود محجوز بالفعل — يبدو أن شخصاً آخر استخدمه للتو.';
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'إرسال الحجز';
+          return;
+        }
+        await docRef.update(payload);
+        showSuccess();
+      } catch (err) {
+        // A rejected-by-rules write also lands here — treat it the same way.
+        errorEl.textContent = 'هذا الكود محجوز بالفعل أو حدث خطأ. حاول تحديث الصفحة والمحاولة من جديد.';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'إرسال الحجز';
+        console.error(err);
+      }
+    }
+
+    function showSuccess() {
+      card.innerHTML = `
+        <div class="success-icon">✅</div>
+        <h1 style="color:var(--success)">تم التسجيل بنجاح</h1>
+        <p class="sub">شكراً لك، تم استلام بيانات الحجز وسيتواصل معك المعلم قريباً.</p>
+      `;
+    }
+  </script>
+</body>
+</html>
