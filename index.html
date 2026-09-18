@@ -102,7 +102,11 @@
         }
         showRegistrationForm(code, data);
       } catch (err) {
-        errorEl.textContent = 'حدث خطأ في الاتصال. تأكد من اتصالك بالإنترنت وحاول مرة أخرى.';
+        // Show the real technical detail right on the page — no developer
+        // tools needed — so it can be screenshotted and diagnosed directly.
+        errorEl.innerHTML = 'حدث خطأ في الاتصال. تأكد من اتصالك بالإنترنت وحاول مرة أخرى.'
+          + '<br><span style="font-size:11px;color:#94a3b8;direction:ltr;display:inline-block;margin-top:6px">'
+          + 'تفاصيل تقنية: ' + (err.code || '') + ' ' + (err.message || String(err)) + '</span>';
         submitBtn.disabled = false;
         submitBtn.textContent = 'تحقق من الكود';
         console.error(err);
@@ -169,7 +173,9 @@
         showSuccess();
       } catch (err) {
         // A rejected-by-rules write also lands here — treat it the same way.
-        errorEl.textContent = 'هذا الكود محجوز بالفعل أو حدث خطأ. حاول تحديث الصفحة والمحاولة من جديد.';
+        errorEl.innerHTML = 'هذا الكود محجوز بالفعل أو حدث خطأ. حاول تحديث الصفحة والمحاولة من جديد.'
+          + '<br><span style="font-size:11px;color:#94a3b8;direction:ltr;display:inline-block;margin-top:6px">'
+          + 'تفاصيل تقنية: ' + (err.code || '') + ' ' + (err.message || String(err)) + '</span>';
         submitBtn.disabled = false;
         submitBtn.textContent = 'إرسال الحجز';
         console.error(err);
