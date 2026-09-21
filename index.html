@@ -114,12 +114,14 @@
     });
 
     function showRegistrationForm(code, codeData) {
+      // Always show the group picker — the student/parent chooses, full
+      // stop, regardless of whether the code happens to have a group
+      // pre-attached. No "smart" skipping.
       card.innerHTML = `
         <h1>إكمال التسجيل</h1>
         <div class="code-info">
           الكود: <b>${code}</b>
           ${codeData.grade ? ' · ' + codeData.grade : ''}
-          ${codeData.groupName ? ' · ' + codeData.groupName : ''}
         </div>
         <form id="register-form">
           <label>اسم الطالب *</label>
@@ -130,11 +132,32 @@
           <input name="studentWhatsapp" type="tel" />
           <label>رقم ولي الأمر</label>
           <input name="parentPhone" type="tel" />
+          <label>المجموعة *</label>
+          <select name="groupId" id="group-select" required><option value="">جارٍ التحميل...</option></select>
           <div class="error" id="register-error"></div>
           <button type="submit">إرسال الحجز</button>
         </form>
       `;
+      loadGroupOptions(codeData.grade);
       document.getElementById('register-form').addEventListener('submit', (e) => submitRegistration(e, code));
+    }
+
+    async function loadGroupOptions(grade) {
+      const select = document.getElementById('group-select');
+      try {
+        let query = db.collection('groups');
+        if (grade) query = query.where('grade', '==', grade);
+        const snap = await query.get();
+        if (snap.empty) {
+          select.innerHTML = '<option value="">لا توجد مجموعات متاحة — تواصل مع المعلم</option>';
+          return;
+        }
+        select.innerHTML = '<option value="">اختر المجموعة</option>' +
+          snap.docs.map(d => `<option value="${d.id}">${d.data().name}</option>`).join('');
+      } catch (err) {
+        select.innerHTML = '<option value="">تعذر تحميل المجموعات</option>';
+        console.error(err);
+      }
     }
 
     async function submitRegistration(e, code) {
@@ -152,6 +175,7 @@
         studentPhone: formData.get('studentPhone') || null,
         studentWhatsapp: formData.get('studentWhatsapp') || null,
         parentPhone: formData.get('parentPhone') || null,
+        studentGroupId: formData.get('groupId') || null,
         usedAt: new Date().toISOString(),
       };
 
