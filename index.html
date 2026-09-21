@@ -23,9 +23,9 @@
   .sub { color: var(--text-muted); font-size: 13px; margin-bottom: 22px; }
   form { text-align: right; display: flex; flex-direction: column; gap: 6px; }
   label { font-size: 13px; color: var(--text-muted); margin-top: 8px; }
-  input {
+  input, select {
     padding: 11px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 15px;
-    font-family: inherit;
+    font-family: inherit; width: 100%; box-sizing: border-box; background: #fff; color: var(--text);
   }
   #code-input { text-align: center; font-size: 22px; letter-spacing: 4px; text-transform: uppercase; }
   button {
@@ -145,9 +145,16 @@
     async function loadGroupOptions(grade) {
       const select = document.getElementById('group-select');
       try {
-        let query = db.collection('groups');
-        if (grade) query = query.where('grade', '==', grade);
-        const snap = await query.get();
+        let snap;
+        if (grade) {
+          snap = await db.collection('groups').where('grade', '==', grade).get();
+          // Fall back to showing every group rather than a dead end if
+          // nothing matches this exact grade (e.g. the group's grade field
+          // wasn't set to match).
+          if (snap.empty) snap = await db.collection('groups').get();
+        } else {
+          snap = await db.collection('groups').get();
+        }
         if (snap.empty) {
           select.innerHTML = '<option value="">لا توجد مجموعات متاحة — تواصل مع المعلم</option>';
           return;
